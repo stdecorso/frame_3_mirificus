@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8" />
+  <title>MIRIFICUS – Dashboard Roma ST</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: #1a1a2e;
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    /* ── HEADER ── */
+    #header {
+      background: linear-gradient(90deg, #7f1d1d 0%, #991b1b 60%, #b91c1c 100%);
+      color: #fff;
+      padding: 8px 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      box-shadow: 0 3px 12px rgba(0,0,0,0.4);
+      z-index: 1001;
+      flex-shrink: 0;
+    }
+    #header strong { font-size: 1.05em; letter-spacing: 1px; }
+    #header span { font-size: 0.78em; opacity: 0.85; }
+
+    /* ── CONTROLS ── */
+    #controls {
+      padding: 7px 20px;
+      background: #16213e;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 24px;
+      border-bottom: 1px solid #0f3460;
+      z-index: 1001;
+      flex-shrink: 0;
+    }
+
+    .control-group { display: flex; align-items: center; gap: 10px; }
+
+    button {
+      padding: 6px 14px;
+      cursor: pointer;
+      border: 1px solid #ef4444;
+      border-radius: 5px;
+      background: transparent;
+      color: #fca5a5;
+      font-weight: 700;
+      font-size: 0.82em;
+      letter-spacing: 0.5px;
+      transition: all 0.18s;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+    button:hover { background: #7f1d1d; color: #fff; }
+    button#playBtn.active { background: #dc2626; color: #fff; border-color: #dc2626; }
+
+    input[type='range'] { width: 260px; cursor: pointer; accent-color: #ef4444; }
+
+    #selected-hour {
+      font-weight: 900;
+      color: #f87171;
+      font-size: 1.3em;
+      font-family: monospace;
+    }
+
+    .hour-display {
+      background: #0f3460;
+      padding: 3px 12px;
+      border-radius: 20px;
+      border: 1px solid #1e4d8c;
+      font-family: monospace;
+      color: #93c5fd;
+      font-size: 1em;
+    }
+
+    .label-ctrl {
+      font-size: 0.8em;
+      font-weight: 700;
+      color: #94a3b8;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    /* ── GRID 3 FRAME ── */
+    .map-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      grid-template-rows: 1fr;
+      flex-grow: 1;
+      gap: 5px;
+      padding: 5px;
+      background: #0f172a;
+      min-height: 0;
+    }
+
+    .map-frame {
+      border: 1px solid #1e293b;
+      position: relative;
+      background: #0d1117;
+      border-radius: 6px;
+      overflow: hidden;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.5);
+    }
+
+    /* ── TITOLO NEL FRAME ── */
+    .map-title {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      background: rgba(127, 29, 29, 0.92);
+      padding: 4px 12px;
+      font-weight: 800;
+      font-size: 10px;
+      z-index: 1000;
+      border-radius: 4px;
+      color: #fff;
+      text-transform: uppercase;
+      letter-spacing: 1.2px;
+      pointer-events: none;
+      backdrop-filter: blur(4px);
+      box-shadow: 0 1px 6px rgba(0,0,0,0.4);
+    }
+
+    /* Badge "STATICO" per il diff */
+    .badge-static {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      background: rgba(15, 52, 96, 0.92);
+      color: #93c5fd;
+      padding: 3px 9px;
+      font-size: 9px;
+      font-weight: 700;
+      border-radius: 4px;
+      z-index: 1000;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      pointer-events: none;
+    }
+
+    /* ── LEGENDA INTERNA ── */
+    .inline-legend {
+      position: absolute;
+      bottom: 8px;
+      right: 8px;
+      left: 8px;
+      background: rgba(15, 23, 42, 0.88);
+      padding: 6px 10px;
+      z-index: 1000;
+      border-radius: 5px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+      pointer-events: none;
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+      border: 1px solid rgba(255,255,255,0.08);
+      backdrop-filter: blur(4px);
+    }
+
+    .legend-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 9px;
+      font-weight: 700;
+      color: #94a3b8;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .legend-bar-container {
+      width: 100%;
+      height: 13px;
+      border-radius: 3px;
+      overflow: hidden;
+      border: 1px solid rgba(255,255,255,0.12);
+    }
+
+    .legend-img {
+      width: 100%;
+      height: 100%;
+      display: block;
+      object-fit: fill;
+    }
+
+    .legend-labels {
+      display: flex;
+      justify-content: space-between;
+      font-size: 9px;
+      font-weight: 600;
+      color: #64748b;
+      font-family: monospace;
+    }
+
+    .map { width: 100%; height: 100%; }
+  </style>
+</head>
+<body>
+
+  <div id="header">
+    <strong>⬡ MIRIFICUS — Dashboard Roma</strong>
+    <span>Analisi Termica ST · Ante / Post / Differenza</span>
+  </div>
+
+  <div id="controls">
+    <div class="control-group">
+      <button id="playBtn">▶ PLAY</button>
+      <button id="stopBtn">⏸ STOP</button>
+    </div>
+    <div class="control-group">
+      <span class="label-ctrl">Timeline:</span>
+      <input type="range" id="hourRange" min="0" max="24" value="0" step="3" />
+      <div class="hour-display"><span id="selected-hour">00</span>:00</div>
+    </div>
+
+  </div>
+
+  <div class="map-grid" id="main-grid"></div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://rawcdn.githack.com/jieter/Leaflet.Sync/master/L.Map.Sync.js"></script>
+
+  <script>
+    const centerLatLon = [41.932, 12.618];
+    const defaultZoom = 16;
+    const wmsUrl = 'https://mirificus.isprambiente.it/geoserver/geonode/wms';
+    const maps = {};
+    const activeWMSLayers = {};
+    let playInterval = null;
+
+    // ── Configurazione 3 frame ──
+    // isDynamic: segue la timeline con suffix orario
+    // isStatic:  layer fisso, nessun suffix
+    const layerConfigs = [
+      {
+        id: 'st-ante',
+        title: 'ST ANTE',
+        layer: 'geonode:st_ante_roma',
+        prefix: 'st_ante_roma_',
+        isDynamic: true
+      },
+      {
+        id: 'st-post',
+        title: 'ST POST',
+        layer: 'geonode:st_post_roma',
+        prefix: 'st_post_roma_',
+        isDynamic: true
+      },
+      {
+        id: 'st-diff',
+        title: 'ST DIFF',
+        layer: 'geonode:st_diff_roma0',
+        prefix: 'st_diff_roma_',
+        isDynamic: true
+      }
+    ];
+
+    // ── Testi legenda per layer dinamici ──
+    function getLegendText(id, hour) {
+      const isDay = hour >= 9 && hour <= 18;
+      if (id === 'st-ante' || id === 'st-post') {
+        return isDay ? ['28°C', '52°C'] : ['16°C', '24°C'];
+      }
+      return ['—', '—'];
+    }
+
+    // ── Costruzione DOM frame ──
+    const grid = document.getElementById('main-grid');
+    layerConfigs.forEach(cfg => {
+      const frame = document.createElement('div');
+      frame.className = 'map-frame';
+      frame.innerHTML = `
+        <div class="map-title">${cfg.title}</div>
+
+        <div id="map-${cfg.id}" class="map"></div>
+        <div class="inline-legend">
+          <div class="legend-top">
+            <span>Legenda ${cfg.title}</span>
+          </div>
+          <div class="legend-bar-container">
+            <img id="leg-img-${cfg.id}" class="legend-img" alt="legenda">
+          </div>
+          <div class="legend-labels">
+            <span id="min-${cfg.id}">-</span>
+            <span id="max-${cfg.id}">-</span>
+          </div>
+        </div>
+      `;
+      grid.appendChild(frame);
+    });
+
+    // ── Inizializzazione Leaflet ──
+    layerConfigs.forEach((cfg, idx) => {
+      maps[cfg.id] = L.map(`map-${cfg.id}`, {
+        center: centerLatLon,
+        zoom: defaultZoom,
+        zoomControl: idx === 0,
+        attributionControl: false
+      });
+      // Basemap scura per leggibilità termica
+      L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+        subdomains: 'abcd',
+        maxZoom: 20
+      }).addTo(maps[cfg.id]);
+    });
+
+    // ── Sincronizzazione pan/zoom ──
+    const mapList = Object.values(maps);
+    mapList.forEach(m1 => mapList.forEach(m2 => { if (m1 !== m2) m1.sync(m2); }));
+
+    // ── Update layer WMS + legenda ──
+    function updateAllLayers(hourVal) {
+      const styleHour = (hourVal == 24) ? 0 : hourVal;
+      const hourStr = String(styleHour).padStart(2, '0');
+
+      document.getElementById('selected-hour').textContent = String(hourVal).padStart(2, '0');
+      document.getElementById('hourRange').value = hourVal;
+
+      layerConfigs.forEach(cfg => {
+        // Calcola stile e layer URL
+        let styleName, layerName;
+        if (cfg.isDynamic) {
+          styleName = cfg.prefix + hourStr;
+          layerName = cfg.layer;
+        } else {
+          // Layer statico: usa stile di default (stringa vuota = stile server)
+          styleName = cfg.staticStyle !== undefined ? cfg.staticStyle : '';
+          layerName = cfg.layer;
+        }
+
+        // Rimuovi vecchio WMS layer
+        if (activeWMSLayers[cfg.id]) {
+          maps[cfg.id].removeLayer(activeWMSLayers[cfg.id]);
+        }
+
+        // Aggiungi nuovo WMS
+        activeWMSLayers[cfg.id] = L.tileLayer.wms(wmsUrl, {
+          layers: layerName,
+          styles: styleName,
+          format: 'image/png',
+          transparent: true,
+          version: '1.1.1',
+          opacity: 0.85
+        }).addTo(maps[cfg.id]);
+
+        // Legenda grafica dal WMS
+        const legImg = document.getElementById(`leg-img-${cfg.id}`);
+        const legendUrl = `${wmsUrl}?REQUEST=GetLegendGraphic&VERSION=1.0.0&FORMAT=image/png`
+          + `&LAYER=${layerName}&STYLE=${styleName}`
+          + `&WIDTH=250&HEIGHT=20&LEGEND_OPTIONS=layout:horizontal;colorbar:true;label:false;fontSize:0;forceRule:true`;
+        legImg.src = legendUrl;
+
+        // Etichette min/max testo
+        const [minTxt, maxTxt] = cfg.isDynamic
+          ? getLegendText(cfg.id, styleHour)
+          : ['—', '(diff)'];
+        document.getElementById(`min-${cfg.id}`).textContent = minTxt;
+        document.getElementById(`max-${cfg.id}`).textContent = maxTxt;
+      });
+    }
+
+    // ── Controlli ──
+    document.getElementById('playBtn').onclick = function () {
+      if (playInterval) return;
+      this.classList.add('active');
+      playInterval = setInterval(() => {
+        let next = (parseInt(document.getElementById('hourRange').value) + 3);
+        if (next > 24) next = 0;
+        updateAllLayers(next);
+      }, 2500);
+    };
+
+    document.getElementById('stopBtn').onclick = function () {
+      clearInterval(playInterval);
+      playInterval = null;
+      document.getElementById('playBtn').classList.remove('active');
+    };
+
+    document.getElementById('hourRange').oninput = e => {
+      if (playInterval) document.getElementById('stopBtn').click();
+      updateAllLayers(parseInt(e.target.value));
+    };
+
+    // ── Init ──
+    window.onload = () => updateAllLayers(0);
+  </script>
+</body>
+</html>
